@@ -150,13 +150,19 @@ impl CrossCompileConfig {
 fn cross_compiling() -> Result<Option<CrossCompileConfig>> {
     let target = env::var("TARGET")?;
     let host = env::var("HOST")?;
+
     if target == host || (target == "i686-pc-windows-msvc" && host == "x86_64-pc-windows-msvc") {
         return Ok(None);
     }
 
-    if env::var("CARGO_CFG_TARGET_FAMILY")? == "windows" {
-        Ok(Some(CrossCompileConfig::both()?))
+    if let Ok(family) = env::var("CARGO_CFG_TARGET_FAMILY") {
+        if family == "windows" {
+            Ok(Some(CrossCompileConfig::both()?))
+        } else {
+            Ok(Some(CrossCompileConfig::lib_only()?))
+        }
     } else {
+        // wasm32-wasi & wasm32-unknown-unknown defaults to linux
         Ok(Some(CrossCompileConfig::lib_only()?))
     }
 }
@@ -412,7 +418,7 @@ fn load_cross_compile_from_headers(
     };
 
     let config_map = parse_header_defines(python_include_dir.join("pyconfig.h"))?;
-    let shared = config_map.get_bool("Py_ENABLE_SHARED")?;
+    let shared = config_map.get_bool("Py_ENABLE_SHARED").unwrap_or(false);
 
     let interpreter_config = InterpreterConfig {
         version: python_version,
@@ -430,14 +436,18 @@ fn load_cross_compile_from_headers(
 fn load_cross_compile_info(
     python_paths: CrossCompileConfig,
 ) -> Result<(InterpreterConfig, HashMap<String, String>)> {
-    let target_family = env::var("CARGO_CFG_TARGET_FAMILY")?;
-    // Because compiling for windows on linux still includes the unix target family
-    if target_family == "unix" {
-        // Configure for unix platforms using the sysconfigdata file
-        load_cross_compile_from_sysconfigdata(python_paths)
+    if let Ok(target_family) = env::var("CARGO_CFG_TARGET_FAMILY") {
+        // Because compiling for windows on linux still includes the unix target family
+        if target_family == "unix" {
+            // Configure for unix platforms using the sysconfigdata file
+            load_cross_compile_from_sysconfigdata(python_paths)
+        } else {
+            // Must configure by headers on windows platform
+            load_cross_compile_from_headers(python_paths)
+        }
     } else {
-        // Must configure by headers on windows platform
-        load_cross_compile_from_headers(python_paths)
+        // wasm32-wasi & wasm32-unknown-unknown defaults to linux
+        load_cross_compile_from_sysconfigdata(python_paths)
     }
 }
 
@@ -834,6 +844,7 @@ fn main() -> Result<()> {
     } else {
         find_interpreter_and_get_config()?
     };
+
 
     let flags = configure(&interpreter_config)?;
 
