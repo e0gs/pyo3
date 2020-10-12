@@ -1,7 +1,6 @@
 use crate::ffi::object::*;
 use crate::ffi::pyport::Py_ssize_t;
-use libc::wchar_t;
-use std::os::raw::{c_char, c_int, c_void};
+use std::os::raw::{c_char, c_int, c_int as wchar_t, c_void};
 
 #[cfg(not(Py_LIMITED_API))]
 pub type Py_UNICODE = wchar_t;

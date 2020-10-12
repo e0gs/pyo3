@@ -1,7 +1,6 @@
 use crate::ffi::object::PyObject;
 use crate::ffi::pyport::Py_ssize_t;
-use libc::wchar_t;
-use std::os::raw::{c_char, c_int};
+use std::os::raw::{c_char, c_int as wchar_t, c_int};
 
 extern "C" {
     pub fn Py_DecodeLocale(arg1: *const c_char, arg2: Py_ssize_t) -> *mut wchar_t;
